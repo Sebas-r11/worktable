@@ -16,6 +16,12 @@ import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { Shuffle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import {
+  getSugerenciaRazonLabel,
+  getSugerenciaOperarioLabel,
+  getSugerenciaMaquinaDestinoLabel,
+  getSugerenciaImpacto,
+} from '@/lib/display/entities';
 
 export default function SupervisorSugerenciasPage() {
   const { data, isLoading } = useSugerencias();
@@ -68,14 +74,17 @@ export default function SupervisorSugerenciasPage() {
                 {sugerencias.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell className="max-w-[250px]">
-                      <p className="text-sm">{s.razon}</p>
+                      <p className="text-sm">{getSugerenciaRazonLabel(s)}</p>
+                      {s.descripcion && (
+                        <p className="text-xs text-muted-foreground line-clamp-2">{s.descripcion}</p>
+                      )}
                     </TableCell>
-                    <TableCell className="text-sm">#{s.operario_origen}</TableCell>
-                    <TableCell className="text-sm">#{s.maquina_destino}</TableCell>
+                    <TableCell className="text-sm">{getSugerenciaOperarioLabel(s)}</TableCell>
+                    <TableCell className="text-sm">{getSugerenciaMaquinaDestinoLabel(s)}</TableCell>
                     <TableCell>
                       <span className="flex items-center gap-1 text-sm font-medium text-green-600">
                         <TrendingUp className="h-3 w-3" />
-                        +{s.impacto_estimado?.toFixed(1)}%
+                        +{getSugerenciaImpacto(s).toFixed(1)}%
                       </span>
                     </TableCell>
                     <TableCell><StatusBadge value={s.estado} /></TableCell>

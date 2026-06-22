@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useAlertas, useResolverAlerta } from '@/hooks/useApi';
 import { alertasApi } from '@/lib/api';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
@@ -12,24 +13,40 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { Bell, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { formatFechaApi } from '@/lib/display/entities';
 
 export default function SupervisorAlertasPage() {
   const qc = useQueryClient();
-  const { data, isLoading } = useAlertas();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useAlertas({ page });
   const resolverAlerta = useResolverAlerta();
 
   const resolverTodas = useMutation({
     mutationFn: async () => {
       const activas = data?.results.filter((a) => a.estado === 'ACTIVA') ?? [];
-      await Promise.all(activas.map((a) => alertasApi.alertaResolver(a.id)));
+      const results = await Promise.allSettled(
+        activas.map((a) => alertasApi.alertaResolver(a.id)),
+      );
+      const fallidas = results.filter((r) => r.status === 'rejected').length;
+      if (fallidas > 0) {
+        throw new Error(`${fallidas} alertas no pudieron resolverse`);
+      }
     },
     onSuccess: () => {
       toast.success('Todas las alertas resueltas');
       qc.invalidateQueries({ queryKey: ['alertas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+      qc.invalidateQueries({ queryKey: ['notificaciones'] });
     },
-    onError: () => toast.error('Error al resolver alertas'),
+    onError: (err) => {
+      const msg = err instanceof Error ? err.message : 'Error al resolver alertas';
+      toast.error(msg);
+      qc.invalidateQueries({ queryKey: ['alertas'] });
+      qc.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 
   if (isLoading) return <PageLoader />;
@@ -77,7 +94,7 @@ export default function SupervisorAlertasPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Mensaje</TableHead>
+                  <TableHead>Alerta</TableHead>
                   <TableHead>Prioridad</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Creada</TableHead>
@@ -88,12 +105,15 @@ export default function SupervisorAlertasPage() {
                 {alertas.map((alerta) => (
                   <TableRow key={alerta.id}>
                     <TableCell className="max-w-[300px]">
-                      <p className="text-sm">{alerta.mensaje}</p>
+                      <p className="text-sm font-medium">{alerta.titulo}</p>
+                      {alerta.descripcion && alerta.descripcion !== alerta.titulo && (
+                        <p className="text-xs text-muted-foreground">{alerta.descripcion}</p>
+                      )}
                     </TableCell>
                     <TableCell><StatusBadge value={alerta.prioridad} /></TableCell>
                     <TableCell><StatusBadge value={alerta.estado} /></TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(alerta.created_at).toLocaleString('es')}
+                      {formatFechaApi(alerta.fecha_creacion)}
                     </TableCell>
                     <TableCell className="text-right">
                       {alerta.estado === 'ACTIVA' && (
@@ -117,6 +137,11 @@ export default function SupervisorAlertasPage() {
               </TableBody>
             </Table>
           )}
+          <PaginationBar
+            page={page}
+            total={data?.count ?? 0}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

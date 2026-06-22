@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { authApi } from '@/lib/api/usuarios';
-import { saveTokens, clearTokens } from '@/lib/api/client';
+import { saveTokens, clearTokens, getRefreshToken } from '@/lib/api/client';
 import type { AuthUser, LoginCredentials } from '@/types';
 
 interface AuthState {
@@ -12,7 +12,7 @@ interface AuthState {
   isLoading: boolean;
   error: string | null;
   login: (credentials: LoginCredentials) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   clearError: () => void;
 }
@@ -42,9 +42,18 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      logout: () => {
-        clearTokens();
-        set({ user: null, isAuthenticated: false, error: null });
+      logout: async () => {
+        const refresh = getRefreshToken();
+        try {
+          if (refresh) {
+            await authApi.logout(refresh);
+          }
+        } catch {
+          // Ignorar errores de red al cerrar sesión
+        } finally {
+          clearTokens();
+          set({ user: null, isAuthenticated: false, error: null });
+        }
       },
 
       loadUser: async () => {

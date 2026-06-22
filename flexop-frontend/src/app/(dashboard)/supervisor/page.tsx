@@ -8,11 +8,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Bell, Shuffle, Cpu, Users, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
+import { DataFetchAlert } from '@/components/shared/DataFetchAlert';
+import { getAlertaTexto, getSugerenciaImpacto, getSugerenciaRazonLabel } from '@/lib/display/entities';
 
 export default function SupervisorDashboard() {
   const qc = useQueryClient();
 
-  const { data: dashboard, isLoading: loadingDash } = useQuery({
+  const { data: dashboard, isLoading: loadingDash, isError, error, refetch } = useQuery({
     queryKey: ['dashboard', 'supervisor'],
     queryFn: () => reportesApi.dashboardSupervisor().then((r) => r.data),
     refetchInterval: 30_000,
@@ -65,6 +67,15 @@ export default function SupervisorDashboard() {
     return <div className="animate-pulse space-y-4"><div className="h-32 bg-slate-200 rounded-lg" /></div>;
   }
 
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Dashboard Supervisor</h1>
+        <DataFetchAlert error={error} onRetry={() => refetch()} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">Dashboard Supervisor</h1>
@@ -79,7 +90,7 @@ export default function SupervisorDashboard() {
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold text-green-600">
-              {dashboard?.maquinas_estado.find((m) => m.estado === 'OPERANDO')?.count ?? 0}
+              {(dashboard?.maquinas_estado ?? []).filter((m) => m.estado === 'OPERANDO').length}
             </p>
           </CardContent>
         </Card>
@@ -100,11 +111,11 @@ export default function SupervisorDashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-1">
-              <Users className="h-4 w-4" /> Operarios activos
+              <Users className="h-4 w-4" /> Incidencias abiertas
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{dashboard?.operarios_activos ?? 0}</p>
+            <p className="text-2xl font-bold">{dashboard?.incidencias_abiertas ?? 0}</p>
           </CardContent>
         </Card>
 
@@ -142,7 +153,7 @@ export default function SupervisorDashboard() {
                         {alerta.prioridad}
                       </Badge>
                     </div>
-                    <p className="text-sm">{alerta.mensaje}</p>
+                    <p className="text-sm">{getAlertaTexto(alerta)}</p>
                   </div>
                   <Button
                     size="sm"
@@ -171,9 +182,9 @@ export default function SupervisorDashboard() {
             ) : (
               (sugerencias?.results ?? []).map((s) => (
                 <div key={s.id} className="p-3 border rounded-lg space-y-2">
-                  <p className="text-sm">{s.razon}</p>
+                  <p className="text-sm">{getSugerenciaRazonLabel(s)}</p>
                   <p className="text-xs text-muted-foreground">
-                    Impacto estimado: +{s.impacto_estimado?.toFixed(1)}%
+                    Impacto estimado: +{getSugerenciaImpacto(s).toFixed(1)}%
                   </p>
                   <div className="flex gap-2">
                     <Button

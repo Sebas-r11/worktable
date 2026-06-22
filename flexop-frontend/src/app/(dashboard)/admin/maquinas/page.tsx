@@ -2,8 +2,11 @@
 
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useMaquinas, useTiposMaquina } from '@/hooks/useApi';
+import { useMaquinas, useTiposMaquina, useUnidadesEficiencia } from '@/hooks/useApi';
 import { maquinasApi } from '@/lib/api/maquinas';
+import { useAuthStore } from '@/stores/authStore';
+import { getMaquinaEstado } from '@/lib/display/entities';
+import type { Maquina } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +23,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { Cpu, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
@@ -29,26 +33,55 @@ import { zodResolver } from '@hookform/resolvers/zod';
 const schema = z.object({
   nombre: z.string().min(2, 'Mínimo 2 caracteres'),
   codigo: z.string().min(1, 'Requerido'),
-  tipo: z.string().transform(Number),
-  eficiencia_objetivo: z.string().transform(Number),
-  descripcion: z.string().optional(),
+  tipo: z.string().min(1, 'Selecciona un tipo').transform(Number),
+  capacidad_teorica: z.string().min(1, 'Requerido').transform(Number).pipe(z.number().positive('Debe ser mayor a 0')),
+  unidad_capacidad: z.string().min(1, 'Selecciona una unidad').transform(Number),
+  marca: z.string().optional(),
+  ubicacion: z.string().optional(),
 });
-type FormInput = { nombre: string; codigo: string; tipo: string; eficiencia_objetivo: string; descripcion?: string };
+type FormInput = {
+  nombre: string;
+  codigo: string;
+  tipo: string;
+  capacidad_teorica: string;
+  unidad_capacidad: string;
+  marca?: string;
+  ubicacion?: string;
+};
 type FormData = z.infer<typeof schema>;
 
 export default function AdminMaquinasPage() {
   const qc = useQueryClient();
+  const empresa = useAuthStore((s) => s.user?.empresa);
   const [open, setOpen] = useState(false);
-  const { data, isLoading } = useMaquinas();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useMaquinas({ page });
   const { data: tipos } = useTiposMaquina();
+  const { data: unidades } = useUnidadesEficiencia();
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormInput>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormInput>({
     resolver: zodResolver(schema) as never,
-    defaultValues: { eficiencia_objetivo: '80' },
   });
 
+  const tipoId = watch('tipo');
+  const unidadId = watch('unidad_capacidad');
+
   const crear = useMutation({
-    mutationFn: (values: FormData) => maquinasApi.create(values as unknown as import('@/types').Maquina),
+    mutationFn: (values: FormData) => {
+      if (!empresa) {
+        return Promise.reject(new Error('Sin empresa asignada'));
+      }
+      return maquinasApi.create({
+        nombre: values.nombre,
+        codigo: values.codigo,
+        tipo: values.tipo,
+        capacidad_teorica: values.capacidad_teorica,
+        unidad_capacidad: values.unidad_capacidad,
+        marca: values.marca,
+        ubicacion: values.ubicacion,
+        empresa,
+      });
+    },
     onSuccess: () => {
       toast.success('Máquina creada');
       qc.invalidateQueries({ queryKey: ['maquinas'] });
@@ -58,16 +91,20 @@ export default function AdminMaquinasPage() {
     onError: () => toast.error('Error al crear máquina'),
   });
 
-  const toggleActivo = useMutation({
-    mutationFn: ({ id, activo }: { id: number; activo: boolean }) =>
-      maquinasApi.update(id, { activo: !activo }),
-    onSuccess: () => { toast.success('Máquina actualizada'); qc.invalidateQueries({ queryKey: ['maquinas'] }); },
+  const toggleActiva = useMutation({
+    mutationFn: ({ id, activa }: { id: number; activa: boolean }) =>
+      maquinasApi.update(id, { activa: !activa }),
+    onSuccess: () => {
+      toast.success('Máquina actualizada');
+      qc.invalidateQueries({ queryKey: ['maquinas'] });
+    },
   });
 
   if (isLoading) return <PageLoader />;
 
   const maquinas = data?.results ?? [];
   const tiposList = tipos?.results ?? [];
+  const unidadesList = unidades?.results ?? [];
 
   return (
     <div className="space-y-6">
@@ -96,7 +133,10 @@ export default function AdminMaquinasPage() {
               </div>
               <div className="space-y-2">
                 <Label>Tipo de máquina</Label>
-                <Select onValueChange={(v) => setValue('tipo', v)}>
+                <Select
+                  value={tipoId}
+                  onValueChange={(v) => setValue('tipo', v, { shouldValidate: true })}
+                >
                   <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                   <SelectContent>
                     {tiposList.map((t) => (
@@ -106,17 +146,41 @@ export default function AdminMaquinasPage() {
                 </Select>
                 {errors.tipo && <p className="text-xs text-destructive">{errors.tipo.message}</p>}
               </div>
-              <div className="space-y-2">
-                <Label>Eficiencia objetivo (%)</Label>
-                <Input type="number" min={1} max={100} {...register('eficiencia_objetivo')} />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Capacidad teórica</Label>
+                  <Input type="number" min={0.01} step="any" {...register('capacidad_teorica')} />
+                  {errors.capacidad_teorica && <p className="text-xs text-destructive">{errors.capacidad_teorica.message}</p>}
+                </div>
+                <div className="space-y-2">
+                  <Label>Unidad</Label>
+                  <Select
+                    value={unidadId}
+                    onValueChange={(v) => setValue('unidad_capacidad', v, { shouldValidate: true })}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                    <SelectContent>
+                      {unidadesList.map((u) => (
+                        <SelectItem key={u.id} value={String(u.id)}>{u.nombre} ({u.abreviatura})</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.unidad_capacidad && <p className="text-xs text-destructive">{errors.unidad_capacidad.message}</p>}
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Descripción</Label>
-                <Input {...register('descripcion')} placeholder="Opcional..." />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Marca</Label>
+                  <Input {...register('marca')} placeholder="Opcional" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Ubicación</Label>
+                  <Input {...register('ubicacion')} placeholder="Opcional" />
+                </div>
               </div>
               <div className="flex gap-2 justify-end">
                 <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
-                <Button type="submit" disabled={crear.isPending}>
+                <Button type="submit" disabled={crear.isPending || !empresa}>
                   {crear.isPending ? 'Creando...' : 'Crear'}
                 </Button>
               </div>
@@ -139,29 +203,31 @@ export default function AdminMaquinasPage() {
                   <TableHead>Código</TableHead>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Estado</TableHead>
-                  <TableHead>Eficiencia obj.</TableHead>
+                  <TableHead>Capacidad</TableHead>
                   <TableHead>Activa</TableHead>
                   <TableHead className="text-right">Acción</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {maquinas.map((m) => (
+                {maquinas.map((m: Maquina) => (
                   <TableRow key={m.id}>
                     <TableCell className="font-mono text-sm">{m.codigo}</TableCell>
                     <TableCell className="font-medium">{m.nombre}</TableCell>
-                    <TableCell><StatusBadge value={m.estado} /></TableCell>
-                    <TableCell>{m.eficiencia_objetivo}%</TableCell>
+                    <TableCell><StatusBadge value={getMaquinaEstado(m)} /></TableCell>
                     <TableCell>
-                      <StatusBadge value={m.activo ? 'ACTIVO' : 'INACTIVO'} />
+                      {m.capacidad_teorica} {m.unidad_nombre ?? ''}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge value={m.activa ? 'ACTIVO' : 'INACTIVO'} />
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => toggleActivo.mutate({ id: m.id, activo: m.activo })}
-                        disabled={toggleActivo.isPending}
+                        onClick={() => toggleActiva.mutate({ id: m.id, activa: m.activa })}
+                        disabled={toggleActiva.isPending}
                       >
-                        {m.activo ? 'Desactivar' : 'Activar'}
+                        {m.activa ? 'Desactivar' : 'Activar'}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -169,6 +235,11 @@ export default function AdminMaquinasPage() {
               </TableBody>
             </Table>
           )}
+          <PaginationBar
+            page={page}
+            total={data?.count ?? 0}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

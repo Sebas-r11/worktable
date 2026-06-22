@@ -1,8 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useOperarios, useTurnos } from '@/hooks/useApi';
 import { operacionesApi } from '@/lib/api/operaciones';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -17,7 +19,8 @@ import { toast } from 'sonner';
 
 export default function AdminOperariosPage() {
   const qc = useQueryClient();
-  const { data, isLoading } = useOperarios();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useOperarios({ page });
   const { data: turnos } = useTurnos();
 
   const toggleActivo = useMutation({
@@ -54,6 +57,7 @@ export default function AdminOperariosPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Usuario</TableHead>
+                  <TableHead>Código</TableHead>
                   <TableHead>Turno</TableHead>
                   <TableHead>Habilidades</TableHead>
                   <TableHead>Estado</TableHead>
@@ -63,21 +67,29 @@ export default function AdminOperariosPage() {
               <TableBody>
                 {operarios.map((op) => (
                   <TableRow key={op.id}>
-                    <TableCell className="font-medium">#{op.usuario}</TableCell>
+                    <TableCell className="font-medium">
+                      {op.usuario_nombre ?? `#${op.usuario}`}
+                      {op.usuario_username && (
+                        <span className="text-xs text-muted-foreground ml-1">({op.usuario_username})</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-sm text-muted-foreground">
+                      {op.codigo_empleado ?? '—'}
+                    </TableCell>
                     <TableCell className="text-sm">
-                      {op.turno ? turnoMap[op.turno] ?? `#${op.turno}` : '—'}
+                      {op.turno_nombre ?? (op.turno ? `#${op.turno}` : '—')}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
-                        {(op.habilidades ?? []).slice(0, 3).map((h) => (
-                          <Badge key={h} variant="secondary" className="text-xs">#{h}</Badge>
+                        {(op.habilidades_nombres ?? op.habilidades ?? []).slice(0, 3).map((h, i) => (
+                          <Badge key={i} variant="secondary" className="text-xs">{h}</Badge>
                         ))}
-                        {(op.habilidades?.length ?? 0) > 3 && (
+                        {((op.habilidades_nombres ?? op.habilidades ?? []).length) > 3 && (
                           <Badge variant="outline" className="text-xs">
-                            +{(op.habilidades?.length ?? 0) - 3}
+                            +{((op.habilidades_nombres ?? op.habilidades ?? []).length) - 3}
                           </Badge>
                         )}
-                        {(op.habilidades?.length ?? 0) === 0 && (
+                        {((op.habilidades_nombres ?? op.habilidades ?? []).length) === 0 && (
                           <span className="text-xs text-muted-foreground">Sin habilidades</span>
                         )}
                       </div>
@@ -100,6 +112,11 @@ export default function AdminOperariosPage() {
               </TableBody>
             </Table>
           )}
+          <PaginationBar
+            page={page}
+            total={data?.count ?? 0}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

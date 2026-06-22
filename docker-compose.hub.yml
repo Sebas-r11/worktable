@@ -1,0 +1,29 @@
+# docker-compose para ejecutar desde Docker Hub (sin necesitar el código fuente)
+# Uso: docker compose -f docker-compose.hub.yml up
+
+services:
+  backend:
+    image: sebas110/flexop-backend:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - backend_media:/app/media
+    environment:
+      - SECRET_KEY=django-insecure-dev-key-change-in-production-12345
+      - DEBUG=True
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+    restart: unless-stopped
+
+  frontend:
+    image: sebas110/flexop-frontend:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+      - BACKEND_INTERNAL_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  backend_media:

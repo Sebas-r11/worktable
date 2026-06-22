@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { getDashboardRoute } from '@/lib/auth/routes';
 import { useAuthStore } from '@/stores/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -34,13 +35,7 @@ export default function LoginPage() {
   // Redirigir según rol si ya está autenticado
   useEffect(() => {
     if (isAuthenticated && user) {
-      const routes: Record<string, string> = {
-        OPERARIO: '/operario',
-        SUPERVISOR: '/supervisor',
-        GERENTE: '/gerente',
-        ADMIN: '/admin/usuarios',
-      };
-      router.replace(routes[user.rol] ?? '/operario');
+      router.replace(getDashboardRoute(user.rol));
     }
   }, [isAuthenticated, user, router]);
 

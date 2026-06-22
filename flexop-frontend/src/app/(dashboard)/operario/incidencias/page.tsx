@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { operacionesApi } from '@/lib/api/operaciones';
-import { useIncidencias, useDashboardOperario } from '@/hooks/useApi';
+import { useIncidencias, useDashboardOperario, useMaquinas } from '@/hooks/useApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,34 +23,52 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { AlertCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
 const schema = z.object({
-  tipo: z.string().min(1, 'Selecciona un tipo'),
+  tipo: z.enum(['FALLA_MAQUINA', 'FALTA_MATERIAL', 'PROBLEMA_CALIDAD', 'OTRO']),
+  titulo: z.string().min(3, 'Mínimo 3 caracteres'),
   descripcion: z.string().min(5, 'Describe la incidencia (mín. 5 caracteres)'),
   prioridad: z.enum(['BAJA', 'MEDIA', 'ALTA', 'CRITICA']),
+  maquina: z.string().min(1, 'Selecciona una máquina'),
 });
 type FormData = z.infer<typeof schema>;
 
-const TIPOS = ['FALLA_MECANICA', 'FALTA_MATERIAL', 'ERROR_OPERARIO', 'PARADA_NO_PLANIFICADA', 'OTRO'];
+const TIPOS: { value: string; label: string }[] = [
+  { value: 'FALLA_MAQUINA', label: 'Falla de Máquina' },
+  { value: 'FALTA_MATERIAL', label: 'Falta de Material' },
+  { value: 'PROBLEMA_CALIDAD', label: 'Problema de Calidad' },
+  { value: 'OTRO', label: 'Otro' },
+];
 
 export default function OperarioIncidenciasPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const { data: dashboard } = useDashboardOperario();
-  const { data, isLoading } = useIncidencias();
+  const { data: maquinasData } = useMaquinas();
+  const { data, isLoading } = useIncidencias({ page });
 
-  const { register, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
+  const { register, handleSubmit, setValue, watch, reset, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { prioridad: 'MEDIA' },
   });
 
+  const maquinaId = watch('maquina');
+  const tipoIncidencia = watch('tipo');
+  const prioridad = watch('prioridad');
+
   const reportar = useMutation({
     mutationFn: (values: FormData) =>
       operacionesApi.incidenciaCreate({
-        asignacion: dashboard?.asignacion_activa?.id,
-        ...values,
+        asignacion: dashboard?.asignacion_activa?.id ?? undefined,
+        maquina: Number(values.maquina),
+        tipo: values.tipo,
+        titulo: values.titulo,
+        descripcion: values.descripcion,
+        prioridad: values.prioridad,
       }),
     onSuccess: () => {
       toast.success('Incidencia reportada');
@@ -84,24 +102,52 @@ export default function OperarioIncidenciasPage() {
             </DialogHeader>
             <form onSubmit={handleSubmit((d) => reportar.mutate(d))} className="space-y-4">
               <div className="space-y-2">
+                <Label>Máquina afectada</Label>
+                <Select
+                  value={maquinaId}
+                  onValueChange={(v) => setValue('maquina', v, { shouldValidate: true })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar máquina..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(maquinasData?.results ?? []).map((m) => (
+                      <SelectItem key={m.id} value={String(m.id)}>{m.nombre} ({m.codigo})</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.maquina && <p className="text-sm text-destructive">{errors.maquina.message}</p>}
+              </div>
+              <div className="space-y-2">
                 <Label>Tipo</Label>
-                <Select onValueChange={(v) => setValue('tipo', v)}>
+                <Select
+                  value={tipoIncidencia}
+                  onValueChange={(v) => setValue('tipo', v as FormData['tipo'], { shouldValidate: true })}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar tipo..." />
                   </SelectTrigger>
                   <SelectContent>
                     {TIPOS.map((t) => (
-                      <SelectItem key={t} value={t}>{t.replace(/_/g, ' ')}</SelectItem>
+                      <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {errors.tipo && <p className="text-sm text-destructive">{errors.tipo.message}</p>}
               </div>
               <div className="space-y-2">
+                <Label htmlFor="titulo">Título</Label>
+                <Input id="titulo" {...register('titulo')} placeholder="Ej: Máquina parada sin motivo" />
+                {errors.titulo && <p className="text-sm text-destructive">{errors.titulo.message}</p>}
+              </div>
+              <div className="space-y-2">
                 <Label>Prioridad</Label>
-                <Select defaultValue="MEDIA" onValueChange={(v) => setValue('prioridad', v as FormData['prioridad'])}>
+                <Select
+                  value={prioridad}
+                  onValueChange={(v) => setValue('prioridad', v as FormData['prioridad'], { shouldValidate: true })}
+                >
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Seleccionar prioridad..." />
                   </SelectTrigger>
                   <SelectContent>
                     {(['BAJA', 'MEDIA', 'ALTA', 'CRITICA'] as const).map((p) => (
@@ -140,7 +186,7 @@ export default function OperarioIncidenciasPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Tipo</TableHead>
-                  <TableHead>Descripción</TableHead>
+                  <TableHead>Título</TableHead>
                   <TableHead>Prioridad</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Fecha</TableHead>
@@ -150,17 +196,22 @@ export default function OperarioIncidenciasPage() {
                 {incidencias.map((inc) => (
                   <TableRow key={inc.id}>
                     <TableCell className="font-medium text-sm">{inc.tipo.replace(/_/g, ' ')}</TableCell>
-                    <TableCell className="text-sm max-w-[200px] truncate">{inc.descripcion}</TableCell>
+                    <TableCell className="text-sm max-w-[200px] truncate">{inc.titulo}</TableCell>
                     <TableCell><StatusBadge value={inc.prioridad} /></TableCell>
                     <TableCell><StatusBadge value={inc.estado} /></TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {new Date(inc.created_at).toLocaleString('es')}
+                      {new Date(inc.fecha_reporte).toLocaleString('es')}
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+          <PaginationBar
+            page={page}
+            total={data?.count ?? 0}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

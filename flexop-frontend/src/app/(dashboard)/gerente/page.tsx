@@ -19,11 +19,12 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts';
+import { DataFetchAlert } from '@/components/shared/DataFetchAlert';
 
 const COLORS = ['#3b82f6', '#f59e0b', '#ef4444', '#10b981', '#8b5cf6'];
 
 export default function GerenteDashboard() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['dashboard', 'gerente'],
     queryFn: () => reportesApi.dashboardGerente().then((r) => r.data),
     refetchInterval: 60_000,
@@ -31,6 +32,15 @@ export default function GerenteDashboard() {
 
   if (isLoading) {
     return <div className="animate-pulse space-y-4"><div className="h-64 bg-slate-200 rounded-lg" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Dashboard Gerente</h1>
+        <DataFetchAlert error={error} onRetry={() => refetch()} />
+      </div>
+    );
   }
 
   return (
@@ -57,7 +67,7 @@ export default function GerenteDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{data?.oee?.toFixed(1) ?? 0}%</p>
+            <p className="text-3xl font-bold">{data?.oee_aproximado?.toFixed(1) ?? 0}%</p>
           </CardContent>
         </Card>
 
@@ -68,7 +78,7 @@ export default function GerenteDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold">{data?.cumplimiento?.toFixed(1) ?? 0}%</p>
+            <p className="text-3xl font-bold">{data?.cumplimiento_objetivos?.toFixed(1) ?? 0}%</p>
           </CardContent>
         </Card>
       </div>
@@ -77,16 +87,16 @@ export default function GerenteDashboard() {
         {/* Tendencia producción */}
         <Card>
           <CardHeader>
-            <CardTitle>Producción últimos 7 días</CardTitle>
+            <CardTitle>Eficiencia últimos 7 días</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
-              <LineChart data={data?.produccion_semana ?? []}>
+              <LineChart data={data?.tendencia_eficiencia ?? data?.tendencia ?? []}>
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
                 <XAxis dataKey="fecha" tick={{ fontSize: 11 }} />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip />
-                <Line type="monotone" dataKey="cantidad" stroke="#3b82f6" strokeWidth={2} dot={false} />
+                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => [`${v}%`, 'Eficiencia']} />
+                <Line type="monotone" dataKey="eficiencia" stroke="#3b82f6" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </CardContent>
@@ -104,7 +114,7 @@ export default function GerenteDashboard() {
               <BarChart data={data?.top_operarios ?? []} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
                 <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11 }} />
-                <YAxis dataKey="operario" type="category" tick={{ fontSize: 11 }} width={80} />
+                <YAxis dataKey="nombre" type="category" tick={{ fontSize: 11 }} width={80} />
                 <Tooltip formatter={(v) => [`${v}%`, 'Eficiencia']} />
                 <Bar dataKey="eficiencia" fill="#3b82f6" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -121,15 +131,15 @@ export default function GerenteDashboard() {
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie
-                  data={data?.incidencias_semana ?? []}
-                  dataKey="count"
+                  data={data?.estadisticas_incidencias?.por_tipo ?? []}
+                  dataKey="total"
                   nameKey="tipo"
                   cx="50%"
                   cy="50%"
                   outerRadius={80}
-                  label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  label={({ name, percent }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
                 >
-                  {(data?.incidencias_semana ?? []).map((_, i) => (
+                  {(data?.estadisticas_incidencias?.por_tipo ?? []).map((_: unknown, i: number) => (
                     <Cell key={i} fill={COLORS[i % COLORS.length]} />
                   ))}
                 </Pie>

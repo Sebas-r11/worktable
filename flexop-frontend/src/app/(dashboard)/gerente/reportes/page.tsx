@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { reportesApi } from '@/lib/api';
+import { downloadBlob } from '@/lib/download';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,29 +11,45 @@ import {
 } from '@/components/ui/table';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { FileText, Download } from 'lucide-react';
 import { toast } from 'sonner';
+import type { ReporteGenerado } from '@/types';
+import { formatFechaApi } from '@/lib/display/entities';
 
 export default function GerenteReportesPage() {
+  const [page, setPage] = useState(1);
   const { data, isLoading } = useQuery({
-    queryKey: ['reportes-generados'],
-    queryFn: () => reportesApi.reportesGenerados().then((r) => r.data),
+    queryKey: ['reportes-generados', page],
+    queryFn: () => reportesApi.reportesGenerados({ page }).then((r) => r.data),
   });
 
   const handleExportCSV = async () => {
     try {
-      const response = await reportesApi.exportarCSV();
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `flexop_reporte_${new Date().toISOString().slice(0, 10)}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
+      const hoy = new Date().toISOString().slice(0, 10);
+      const hace7 = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const response = await reportesApi.exportarCSV({
+        tipo: 'eficiencia',
+        fecha_inicio: hace7,
+        fecha_fin: hoy,
+      });
+      downloadBlob(
+        new Blob([response.data]),
+        `flexop_reporte_${new Date().toISOString().slice(0, 10)}.csv`,
+      );
       toast.success('Reporte CSV descargado');
     } catch {
       toast.error('Error al exportar reporte');
+    }
+  };
+
+  const handleDownloadReporte = async (id: number, tipo: string) => {
+    try {
+      const response = await reportesApi.descargarReporte(id);
+      downloadBlob(response.data as Blob, `reporte_${tipo}_${id}.csv`);
+      toast.success('Reporte descargado');
+    } catch {
+      toast.error('Error al descargar reporte');
     }
   };
 
@@ -66,34 +84,48 @@ export default function GerenteReportesPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Nombre</TableHead>
+                  <TableHead>Reporte</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Formato</TableHead>
                   <TableHead>Generado</TableHead>
                   <TableHead className="text-right">Descargar</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {reportes.map((r: { id: number; nombre?: string; tipo?: string; created_at?: string; archivo?: string }) => (
+                {reportes.map((r: ReporteGenerado) => (
                   <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.nombre ?? `Reporte #${r.id}`}</TableCell>
-                    <TableCell className="text-sm text-muted-foreground">{r.tipo ?? '—'}</TableCell>
+                    <TableCell className="font-medium">
+                      {r.tipo_display ?? r.tipo} #{r.id}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.tipo_display ?? r.tipo}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{r.formato_display ?? r.formato}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">
-                      {r.created_at ? new Date(r.created_at).toLocaleString('es') : '—'}
+                      {r.fecha_generacion ? formatFechaApi(r.fecha_generacion) : '—'}
                     </TableCell>
                     <TableCell className="text-right">
-                      {r.archivo && (
-                        <Button size="sm" variant="ghost" asChild>
-                          <a href={r.archivo} download>
-                            <Download className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          handleDownloadReporte(
+                            r.id,
+                            r.tipo_display ?? r.tipo,
+                          )
+                        }
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+          <PaginationBar
+            page={page}
+            total={data?.count ?? 0}
+            onPageChange={setPage}
+          />
         </CardContent>
       </Card>
     </div>

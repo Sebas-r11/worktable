@@ -2,27 +2,28 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { getDashboardRoute } from '@/lib/auth/routes';
 import { useAuthStore } from '@/stores/authStore';
+import { PageLoader } from '@/components/shared/LoadingSpinner';
 
 export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isLoading, user, loadUser } = useAuthStore();
 
   useEffect(() => {
+    loadUser();
+  }, [loadUser]);
+
+  useEffect(() => {
+    if (isLoading) return;
     if (!isAuthenticated) {
       router.replace('/login');
       return;
     }
     if (user) {
-      const routes: Record<string, string> = {
-        OPERARIO: '/operario',
-        SUPERVISOR: '/supervisor',
-        GERENTE: '/gerente',
-        ADMIN: '/admin/usuarios',
-      };
-      router.replace(routes[user.rol] ?? '/login');
+      router.replace(getDashboardRoute(user.rol));
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, isLoading, user, router]);
 
-  return null;
+  return <PageLoader />;
 }

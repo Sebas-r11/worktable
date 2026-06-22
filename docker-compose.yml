@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: flexop
+      POSTGRES_USER: flexop
+      POSTGRES_PASSWORD: flexop_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U flexop -d flexop']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - '8000:8000'
+    volumes:
+      - ./backend:/app
+      - backend_media:/app/media
+    environment:
+      - SECRET_KEY=django-insecure-dev-key-change-in-production-12345
+      - DEBUG=True
+      - ALLOWED_HOSTS=localhost,127.0.0.1,backend
+      - CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+      - DATABASE_URL=postgres://flexop:flexop_dev@db:5432/flexop
+    depends_on:
+      db:
+        condition: service_healthy
+    command: python manage.py runserver 0.0.0.0:8000
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./flexop-frontend
+      dockerfile: Dockerfile
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./flexop-frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=/api
+      - BACKEND_INTERNAL_URL=http://backend:8000
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  backend_media:
+
+# Levantar: docker compose up --build -d
+# Detener: docker compose down

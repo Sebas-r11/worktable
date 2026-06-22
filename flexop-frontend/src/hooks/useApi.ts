@@ -27,6 +27,13 @@ export function useTiposMaquina() {
   });
 }
 
+export function useUnidadesEficiencia() {
+  return useQuery({
+    queryKey: ['unidades-eficiencia'],
+    queryFn: () => maquinasApi.unidadesList().then((r) => r.data),
+  });
+}
+
 // ─── Operaciones ──────────────────────────────────────────────────
 export function useTurnos() {
   return useQuery({

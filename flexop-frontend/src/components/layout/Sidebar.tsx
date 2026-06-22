@@ -3,52 +3,13 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
+import { getNavItemsForRole, isNavItemActive } from '@/lib/auth/nav';
 import { cn } from '@/lib/utils';
-import {
-  LayoutDashboard,
-  Cpu,
-  Users,
-  Activity,
-  BarChart3,
-  Bell,
-  Shuffle,
-  FileText,
-  ClipboardList,
-  Building2,
-  PackagePlus,
-  AlertCircle,
-} from 'lucide-react';
-
-const navByRole: Record<string, { href: string; label: string; icon: React.ElementType }[]> = {
-  OPERARIO: [
-    { href: '/operario', label: 'Mi Dashboard', icon: LayoutDashboard },
-    { href: '/operario/produccion', label: 'Producción', icon: PackagePlus },
-    { href: '/operario/incidencias', label: 'Incidencias', icon: AlertCircle },
-  ],
-  SUPERVISOR: [
-    { href: '/supervisor', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/supervisor/alertas', label: 'Alertas', icon: Bell },
-    { href: '/supervisor/sugerencias', label: 'Reasignaciones', icon: Shuffle },
-    { href: '/supervisor/asignaciones', label: 'Asignaciones', icon: Activity },
-    { href: '/supervisor/incidencias', label: 'Incidencias', icon: AlertCircle },
-  ],
-  GERENTE: [
-    { href: '/gerente', label: 'Dashboard', icon: LayoutDashboard },
-    { href: '/gerente/reportes', label: 'Reportes', icon: FileText },
-    { href: '/gerente/metricas', label: 'Métricas', icon: BarChart3 },
-    { href: '/gerente/ordenes', label: 'Órdenes', icon: ClipboardList },
-  ],
-  ADMIN: [
-    { href: '/admin/usuarios', label: 'Usuarios', icon: Users },
-    { href: '/admin/maquinas', label: 'Máquinas', icon: Cpu },
-    { href: '/admin/operarios', label: 'Operarios', icon: Users },
-  ],
-};
 
 export function Sidebar() {
   const pathname = usePathname();
   const { user } = useAuthStore();
-  const navItems = user ? (navByRole[user.rol] ?? []) : [];
+  const navItems = user ? getNavItemsForRole(user.rol) : [];
 
   return (
     <aside className="w-64 flex-shrink-0 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 flex flex-col">
@@ -65,7 +26,7 @@ export function Sidebar() {
             href={href}
             className={cn(
               'flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors',
-              pathname === href
+              isNavItemActive(pathname, href)
                 ? 'bg-primary text-primary-foreground'
                 : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
             )}

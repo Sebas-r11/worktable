@@ -138,7 +138,7 @@ export default function OperarioProduccionPage() {
                 {registros.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="text-sm text-muted-foreground">
-                      {new Date(r.created_at).toLocaleString('es')}
+                      {new Date(r.fecha_hora).toLocaleString('es')}
                     </TableCell>
                     <TableCell className="font-bold">{r.cantidad}</TableCell>
                     <TableCell className="text-sm">{r.observaciones || '—'}</TableCell>

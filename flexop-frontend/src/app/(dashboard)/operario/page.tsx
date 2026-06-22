@@ -1,6 +1,6 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { reportesApi } from '@/lib/api';
 import { operacionesApi } from '@/lib/api/operaciones';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,9 +8,11 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Activity, Target, AlertCircle, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { DataFetchAlert } from '@/components/shared/DataFetchAlert';
 
 export default function OperarioDashboard() {
-  const { data, isLoading, refetch } = useQuery({
+  const qc = useQueryClient();
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['dashboard', 'operario'],
     queryFn: () => reportesApi.dashboardOperario().then((r) => r.data),
     refetchInterval: 30_000,
@@ -21,6 +23,7 @@ export default function OperarioDashboard() {
     try {
       await operacionesApi.asignacionIniciar(data.asignacion_activa.id);
       toast.success('Tarea iniciada');
+      await qc.invalidateQueries({ queryKey: ['dashboard'] });
       refetch();
     } catch {
       toast.error('Error al iniciar la tarea');
@@ -32,6 +35,8 @@ export default function OperarioDashboard() {
     try {
       await operacionesApi.asignacionFinalizar(data.asignacion_activa.id);
       toast.success('Tarea finalizada');
+      await qc.invalidateQueries({ queryKey: ['dashboard'] });
+      await qc.invalidateQueries({ queryKey: ['asignaciones'] });
       refetch();
     } catch {
       toast.error('Error al finalizar la tarea');
@@ -42,7 +47,17 @@ export default function OperarioDashboard() {
     return <div className="animate-pulse space-y-4"><div className="h-32 bg-slate-200 rounded-lg" /></div>;
   }
 
+  if (isError) {
+    return (
+      <div className="space-y-6">
+        <h1 className="text-2xl font-bold">Mi Dashboard</h1>
+        <DataFetchAlert error={error} onRetry={() => refetch()} />
+      </div>
+    );
+  }
+
   const eficiencia = data?.eficiencia_hoy ?? 0;
+  const estadoAsignacion = data?.asignacion_activa?.estado ?? 'ACTIVA';
   const eficienciaColor =
     eficiencia >= 90 ? 'text-green-600' : eficiencia >= 70 ? 'text-yellow-600' : 'text-red-600';
 
@@ -63,22 +78,25 @@ export default function OperarioDashboard() {
             <div className="flex items-center gap-4">
               <Badge
                 variant={
-                  data.asignacion_activa.estado === 'ACTIVA' ? 'default' : 'secondary'
+                  estadoAsignacion === 'ACTIVA' ? 'default' : 'secondary'
                 }
               >
-                {data.asignacion_activa.estado}
+                {estadoAsignacion}
               </Badge>
               <span className="text-sm text-muted-foreground">
-                Máquina #{data.asignacion_activa.maquina}
+                Máquina: {data.asignacion_activa.maquina}
               </span>
+              {data.asignacion_activa.turno && (
+                <span className="text-sm text-muted-foreground">Turno: {data.asignacion_activa.turno}</span>
+              )}
             </div>
             <div className="flex gap-3">
-              {data.asignacion_activa.estado === 'PENDIENTE' && (
+              {estadoAsignacion === 'PENDIENTE' && (
                 <Button onClick={handleIniciarTarea} size="sm">
                   Iniciar tarea
                 </Button>
               )}
-              {data.asignacion_activa.estado === 'ACTIVA' && (
+              {estadoAsignacion === 'ACTIVA' && (
                 <Button onClick={handleFinalizarTarea} variant="outline" size="sm">
                   Finalizar tarea
                 </Button>
@@ -116,7 +134,7 @@ export default function OperarioDashboard() {
           </CardHeader>
           <CardContent className="flex items-center gap-2">
             <Target className="h-4 w-4 text-muted-foreground" />
-            <p className="text-2xl font-bold">{data?.objetivo_hoy ?? 0}</p>
+            <p className="text-2xl font-bold">{data?.objetivo_dia ?? 0}</p>
           </CardContent>
         </Card>
 

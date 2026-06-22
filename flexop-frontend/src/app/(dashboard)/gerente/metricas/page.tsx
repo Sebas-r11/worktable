@@ -1,17 +1,17 @@
 'use client';
 
-import { useMetricas, useMaquinas, useOperarios } from '@/hooks/useApi';
+import { useState } from 'react';
+import { useMetricas, useMaquinas } from '@/hooks/useApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
-import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine,
-} from 'recharts';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { BarChart3 } from 'lucide-react';
+import { getMetricaEficiencia, getMetricaObjetivo } from '@/lib/display/entities';
+import { MetricasChart, type MetricasChartPoint } from './MetricasChart';
 
 function eficienciaColor(v: number) {
   if (v >= 90) return 'text-green-600';
@@ -20,7 +20,8 @@ function eficienciaColor(v: number) {
 }
 
 export default function GerenteMetricasPage() {
-  const { data, isLoading } = useMetricas();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useMetricas({ page });
   const { data: maquinas } = useMaquinas();
 
   if (isLoading) return <PageLoader />;
@@ -28,9 +29,9 @@ export default function GerenteMetricasPage() {
   const metricas = data?.results ?? [];
   const maquinaMap = Object.fromEntries((maquinas?.results ?? []).map((m) => [m.id, m.nombre]));
 
-  const chartData = metricas.map((m) => ({
-    nombre: maquinaMap[m.maquina] ?? `M${m.maquina}`,
-    eficiencia: parseFloat(m.eficiencia.toFixed(1)),
+  const chartData: MetricasChartPoint[] = metricas.map((m) => ({
+    nombre: m.maquina_nombre ?? maquinaMap[m.maquina] ?? `M${m.maquina}`,
+    eficiencia: parseFloat(getMetricaEficiencia(m).toFixed(1)),
   }));
 
   return (
@@ -45,16 +46,7 @@ export default function GerenteMetricasPage() {
             <CardTitle>Eficiencia por máquina</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-slate-200" />
-                <XAxis dataKey="nombre" tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, 100]} tick={{ fontSize: 11 }} unit="%" />
-                <Tooltip formatter={(v) => [`${v}%`, 'Eficiencia']} />
-                <ReferenceLine y={80} stroke="#f59e0b" strokeDasharray="4 4" label={{ value: 'Obj 80%', fontSize: 10 }} />
-                <Bar dataKey="eficiencia" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <MetricasChart data={chartData} />
           </CardContent>
         </Card>
       )}
@@ -75,27 +67,34 @@ export default function GerenteMetricasPage() {
                   <TableHead>Máquina</TableHead>
                   <TableHead>Eficiencia</TableHead>
                   <TableHead>Real</TableHead>
-                  <TableHead>Objetivo</TableHead>
+                  <TableHead>Teórica</TableHead>
                   <TableHead>Fecha</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {metricas.map((m) => (
                   <TableRow key={m.id}>
-                    <TableCell className="font-medium">{maquinaMap[m.maquina] ?? `#${m.maquina}`}</TableCell>
+                    <TableCell className="font-medium">{m.maquina_nombre ?? maquinaMap[m.maquina] ?? `#${m.maquina}`}</TableCell>
                     <TableCell>
-                      <span className={`font-bold ${eficienciaColor(m.eficiencia)}`}>
-                        {m.eficiencia.toFixed(1)}%
+                      <span className={`font-bold ${eficienciaColor(getMetricaEficiencia(m))}`}>
+                        {getMetricaEficiencia(m).toFixed(1)}%
                       </span>
                     </TableCell>
-                    <TableCell>{m.produccion_real}</TableCell>
-                    <TableCell>{m.produccion_objetivo}</TableCell>
+                    <TableCell>{m.produccion_real}{m.unidad ? ` ${m.unidad}` : ''}</TableCell>
+                    <TableCell>{getMetricaObjetivo(m)}</TableCell>
                     <TableCell className="text-xs text-muted-foreground">{m.fecha}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           )}
+          <div className="px-6 pb-4">
+            <PaginationBar
+              page={page}
+              total={data?.count ?? 0}
+              onPageChange={setPage}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>
