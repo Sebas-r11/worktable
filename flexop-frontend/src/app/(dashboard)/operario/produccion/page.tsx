@@ -1,12 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { metricasApi } from '@/lib/api';
-import { useDashboardOperario } from '@/hooks/useApi';
+import { useDashboardOperario, useProduccion } from '@/hooks/useApi';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { Plus, PackagePlus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -32,12 +33,10 @@ type FormData = z.infer<typeof schema>;
 export default function OperarioProduccionPage() {
   const qc = useQueryClient();
   const [open, setOpen] = useState(false);
+  const [page, setPage] = useState(1);
   const { data: dashboard } = useDashboardOperario();
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['produccion'],
-    queryFn: () => metricasApi.produccionList().then((r) => r.data),
-  });
+  const { data, isLoading } = useProduccion({ page });
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormInput>({
     resolver: zodResolver(schema) as never,
@@ -147,6 +146,13 @@ export default function OperarioProduccionPage() {
               </TableBody>
             </Table>
           )}
+          <div className="px-6 pb-4">
+            <PaginationBar
+              page={page}
+              total={data?.count ?? 0}
+              onPageChange={setPage}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>

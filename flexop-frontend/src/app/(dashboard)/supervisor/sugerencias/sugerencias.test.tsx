@@ -44,4 +44,38 @@ describe('SupervisorSugerenciasPage (MSW)', () => {
       expect(screen.getByText('ACEPTADA')).toBeInTheDocument();
     });
   });
+
+  it('pagina resultados cuando hay mas de una pagina', async () => {
+    let requestedPage = 1;
+    server.use(
+      http.get(`${API_BASE}/sugerencias/`, ({ request }) => {
+        const url = new URL(request.url);
+        requestedPage = Number(url.searchParams.get('page') ?? 1);
+        const item = {
+          ...mockSugerenciaPendiente,
+          id: requestedPage,
+          razon_display: `Razón página ${requestedPage}`,
+        };
+        return HttpResponse.json({
+          count: 45,
+          next: requestedPage < 3 ? `?page=${requestedPage + 1}` : null,
+          previous: requestedPage > 1 ? `?page=${requestedPage - 1}` : null,
+          results: [item],
+        });
+      }),
+    );
+
+    const user = userEvent.setup();
+    renderWithProviders(<SupervisorSugerenciasPage />);
+
+    expect(await screen.findByText('Razón página 1')).toBeInTheDocument();
+    expect(screen.getByText(/Mostrando 1–20 de 45/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /Siguiente/i }));
+
+    await waitFor(() => {
+      expect(requestedPage).toBe(2);
+      expect(screen.getByText('Razón página 2')).toBeInTheDocument();
+    });
+  });
 });

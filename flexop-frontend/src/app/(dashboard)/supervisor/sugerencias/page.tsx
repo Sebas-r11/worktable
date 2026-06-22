@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   useSugerencias,
   useAceptarSugerencia,
@@ -14,6 +15,7 @@ import {
 import { StatusBadge } from '@/components/shared/StatusBadge';
 import { PageLoader } from '@/components/shared/LoadingSpinner';
 import { EmptyState } from '@/components/shared/EmptyState';
+import { PaginationBar } from '@/components/shared/PaginationBar';
 import { Shuffle, TrendingUp } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -24,7 +26,8 @@ import {
 } from '@/lib/display/entities';
 
 export default function SupervisorSugerenciasPage() {
-  const { data, isLoading } = useSugerencias();
+  const [page, setPage] = useState(1);
+  const { data, isLoading } = useSugerencias({ page });
   const aceptar = useAceptarSugerencia();
   const rechazar = useRechazarSugerencia();
 
@@ -120,6 +123,13 @@ export default function SupervisorSugerenciasPage() {
               </TableBody>
             </Table>
           )}
+          <div className="px-6 pb-4">
+            <PaginationBar
+              page={page}
+              total={data?.count ?? 0}
+              onPageChange={setPage}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>
