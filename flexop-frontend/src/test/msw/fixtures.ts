@@ -237,6 +237,7 @@ export const mockDashboardGerente: DashboardGerente = {
   cumplimiento_objetivos: 88,
   produccion_dia: 1200,
   produccion_semana: 8400,
+  tendencia: [{ fecha: '2026-05-28', eficiencia: 82 }],
   tendencia_eficiencia: [{ fecha: '2026-05-28', eficiencia: 82 }],
   top_operarios: [{ codigo: 'EMP-001', nombre: 'Ana Oper', eficiencia: 91 }],
   comparativa_turnos: [{ turno: 'Mañana', eficiencia: 85 }],

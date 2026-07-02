@@ -29,7 +29,9 @@ describe('token helpers', () => {
   });
 
   it('getAccessToken lee cookie', async () => {
-    vi.mocked(Cookies.get).mockReturnValue('token-abc');
+    vi.mocked(Cookies.get).mockImplementation((name) =>
+      name === 'flexop_access' ? 'token-abc' : undefined,
+    );
     const { getAccessToken } = await import('./client');
     expect(getAccessToken()).toBe('token-abc');
   });

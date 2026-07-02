@@ -57,7 +57,7 @@ describe('display entities', () => {
       produccion_real: '80.00',
       produccion_teorica: '100.00',
       eficiencia_calculada: '82.50',
-    } as MetricaEficiencia;
+    } as unknown as MetricaEficiencia;
     expect(getMetricaEficiencia(metrica)).toBe(82.5);
   });
 
