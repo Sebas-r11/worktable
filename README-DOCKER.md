@@ -1,5 +1,7 @@
 # FLEX-OP — Levantar con Docker
 
+**Demo gratis en internet (Vercel + Render + SQLite):** ver [DEPLOY-DEMO.md](./DEPLOY-DEMO.md).
+
 ## Estructura del proyecto
 
 ```

@@ -6,7 +6,7 @@ from functools import wraps
 from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
-from django.http import Http404
+from django.http import Http404, JsonResponse
 from django.views.static import serve
 from rest_framework_simplejwt.views import (
     TokenRefreshView,
@@ -41,9 +41,16 @@ def _debug_only(view):
     return wrapper
 
 
+def health_check(_request):
+    return JsonResponse({'status': 'ok', 'service': 'flexop-api'})
+
+
 urlpatterns = [
     # Admin
     path('admin/', admin.site.urls),
+
+    # Health check (Render / monitoreo)
+    path('api/health/', health_check, name='health-check'),
 
     # API JWT Authentication
     path('api/auth/login/', FlexTokenObtainPairView.as_view(), name='token_obtain_pair'),
