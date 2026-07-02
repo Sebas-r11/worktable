@@ -32,22 +32,29 @@ else:
         'django-insecure-dev-key-change-in-production-12345',
     )
 
+def _parse_hosts(value: str) -> list[str]:
+    return [host.strip() for host in value.split(',') if host.strip()]
+
+
+_render_host = os.getenv('RENDER_EXTERNAL_HOSTNAME', '').strip()
+
 if DEBUG:
-    ALLOWED_HOSTS = [
-        host.strip()
-        for host in os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
-        if host.strip()
-    ]
+    ALLOWED_HOSTS = _parse_hosts(os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1'))
+    if _render_host:
+        ALLOWED_HOSTS.append(_render_host)
 else:
     _allowed_hosts = os.getenv('ALLOWED_HOSTS', '').strip()
-    if not _allowed_hosts or _allowed_hosts == '*':
+    hosts = _parse_hosts(_allowed_hosts) if _allowed_hosts and _allowed_hosts != '*' else []
+    if _render_host and _render_host not in hosts:
+        hosts.append(_render_host)
+    if not hosts:
         from django.core.exceptions import ImproperlyConfigured
         raise ImproperlyConfigured(
-            'ALLOWED_HOSTS must be set explicitly when DEBUG=False (no wildcard).'
+            'ALLOWED_HOSTS must be set explicitly when DEBUG=False (no wildcard). '
+            'On Render, set ALLOWED_HOSTS=flexop-api.onrender.com or rely on '
+            'RENDER_EXTERNAL_HOSTNAME.'
         )
-    ALLOWED_HOSTS = [
-        host.strip() for host in _allowed_hosts.split(',') if host.strip()
-    ]
+    ALLOWED_HOSTS = hosts
 
 
 # Application definition
