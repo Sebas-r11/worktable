@@ -12,10 +12,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User } from 'lucide-react';
+import { LogOut, Menu, User } from 'lucide-react';
 import { NotificationBell } from '@/components/shared/NotificationBell';
 
-export function TopBar() {
+type TopBarProps = {
+  onOpenMobileNav?: () => void;
+};
+
+export function TopBar({ onOpenMobileNav }: TopBarProps) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
@@ -29,8 +33,22 @@ export function TopBar() {
     : '?';
 
   return (
-    <header className="h-16 flex items-center justify-between px-6 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 flex-shrink-0">
-      <div />
+    <header className="flex h-16 flex-shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 dark:border-slate-800 dark:bg-slate-900 sm:px-6">
+      <div className="flex min-w-0 flex-1 items-center gap-2 lg:flex-none">
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="shrink-0 lg:hidden"
+          aria-label="Abrir menú de navegación"
+          onClick={onOpenMobileNav}
+        >
+          <Menu className="h-5 w-5" />
+        </Button>
+        <span className="truncate text-lg font-bold text-primary lg:hidden">FLEX-OP</span>
+      </div>
+
+      <div className="hidden flex-1 lg:block" />
 
       <div className="flex items-center gap-3">
         <NotificationBell />

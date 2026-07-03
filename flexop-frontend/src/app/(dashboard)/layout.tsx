@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuthStore } from '@/stores/authStore';
 import { canAccessPath, getDashboardRoute } from '@/lib/auth/routes';
@@ -12,6 +12,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const { isAuthenticated, isLoading, loadUser, user } = useAuthStore();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     loadUser();
@@ -41,10 +42,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <Sidebar />
-      <div className="flex flex-col flex-1 overflow-hidden">
-        <TopBar />
-        <main className="flex-1 overflow-y-auto p-6">
+      <Sidebar mobileOpen={mobileNavOpen} onMobileOpenChange={setMobileNavOpen} />
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+        <TopBar onOpenMobileNav={() => setMobileNavOpen(true)} />
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6">
           {user && !user.empresa && (
             <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 flex items-start gap-2">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
